@@ -1,6 +1,8 @@
 import pygame
 import random
 import os
+import asyncio
+import sys
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, FPS, BLACK, WHITE, RED, GRAY, LIGHT_GRAY, SNAKE_COLORS, MENU, PLAYING, GAME_OVER
 from snake import Snake
 
@@ -22,21 +24,41 @@ class Game:
         self.max_snakes = 10
         self.speed_boost = False
         self.snakes_used = 0
+        self.should_quit = False
+
+        # Load high score
+        self.highscore_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "highscore.txt")
+        try:
+            with open(self.highscore_file, "r") as f:
+                self.high_score = int(f.read())
+        except (FileNotFoundError, ValueError):
+            self.high_score = 0
 
         # Sound
-        pygame.mixer.init()
         try:
-            pygame.mixer.music.load(os.path.join("src", "assets", "pac-man.mp3"))
+            pygame.mixer.init()
+            print(f"Mixer initialized: {pygame.mixer.get_init()}")
+            
+            music_path = os.path.join(getattr(sys, '_MEIPASS', os.path.abspath(".")), "assets", "pac-man.mp3")
+            munch_path = os.path.join(getattr(sys, '_MEIPASS', os.path.abspath(".")), "assets", "munch-sound-effect.mp3")
+            death_path = os.path.join(getattr(sys, '_MEIPASS', os.path.abspath(".")), "assets", "lego-yoda-death-sound-effect.mp3")
+
+            print(f"Attempting to load music from: {music_path}")
+            pygame.mixer.music.load(music_path)
             pygame.mixer.music.set_volume(0.1)
             pygame.mixer.music.play(-1)
-            self.munch_sound = pygame.mixer.Sound(os.path.join("src", "assets", "munch-sound-effect.mp3"))
+            
+            print(f"Attempting to load munch sound from: {munch_path}")
+            self.munch_sound = pygame.mixer.Sound(munch_path)
             self.munch_sound.set_volume(0.3)
-            self.death_sound = pygame.mixer.Sound(os.path.join("src", "assets", "lego-yoda-death-sound-effect.mp3"))
+            
+            print(f"Attempting to load death sound from: {death_path}")
+            self.death_sound = pygame.mixer.Sound(death_path)
             self.death_sound.set_volume(0.5)
             self.sounds_loaded = True
-        except pygame.error:
+        except pygame.error as e:
             self.sounds_loaded = False
-            print("Warning: Could not load sound files.")
+            print(f"Warning: Could not load sound files. Error: {e}")
 
     def reset_game(self):
         """Resets the game to its initial state."""
@@ -120,8 +142,8 @@ class Game:
                 if start_hovered:
                     self.reset_game()
                 if quit_hovered:
-                    return False # Signal to quit
-        return True
+                    self.should_quit = True
+        # No return value, main loop handles 'running'
 
     def run_playing(self, events):
         """Runs the main gameplay state."""
@@ -169,6 +191,11 @@ class Game:
         if not self.snakes and self.currency < self.snake_cost:
             if self.score > self.high_score:
                 self.high_score = self.score
+                try:
+                    with open(self.highscore_file, "w") as f:
+                        f.write(str(self.high_score))
+                except IOError:
+                    print("Warning: Could not save high score.")
             self.state = GAME_OVER
 
         # Drawing
@@ -193,7 +220,7 @@ class Game:
         boost_text = "Speed: 10x" if self.speed_boost else "Speed: 1x"
         self.draw_button(speed_boost_rect, boost_text, GRAY, LIGHT_GRAY)
 
-        return True
+        # No return value, main loop handles 'running'
 
     def run_game_over(self, events):
         """Runs the game over state."""
@@ -215,4 +242,27 @@ class Game:
                     self.reset_game()
                 if menu_hovered:
                     self.state = MENU
-        return True
+        # No return value, main loop handles 'running'
+
+    async def run(self):
+        """The main game loop, compatible with asyncio for Pyodide."""
+        running = True
+        while running and not self.should_quit:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    running = False
+
+            if self.state == MENU:
+                self.run_menu(events)
+            elif self.state == PLAYING:
+                self.run_playing(events)
+            elif self.state == GAME_OVER:
+                self.run_game_over(events)
+
+            pygame.display.flip()
+            current_fps = 100 if self.speed_boost else FPS
+            self.clock.tick(current_fps)
+            await asyncio.sleep(0) # Yield control to the browser event loop
+
+        pygame.quit()
