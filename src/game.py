@@ -1,136 +1,8 @@
-
 import pygame
 import random
-import asyncio
-
-# --- Constants ---
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-GRID_SIZE = 20
-GRID_WIDTH = SCREEN_WIDTH // GRID_SIZE
-GRID_HEIGHT = SCREEN_HEIGHT // GRID_SIZE
-FPS = 10
-
-# Colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-CYAN = (0, 255, 255)
-MAGENTA = (255, 0, 255)
-ORANGE = (255, 165, 0)
-PURPLE = (128, 0, 128)
-GRAY = (128, 128, 128)
-LIGHT_GRAY = (200, 200, 200)
-
-SNAKE_COLORS = [GREEN, BLUE, YELLOW, CYAN, MAGENTA, ORANGE, PURPLE, RED]
-
-# Game States
-MENU = "MENU"
-PLAYING = "PLAYING"
-GAME_OVER = "GAME_OVER"
-
-# --- Classes ---
-
-class Snake:
-    """Manages each snake's state, movement, and behavior."""
-    def __init__(self, color, start_pos, start_dir):
-        self.body = [start_pos]
-        self.direction = start_dir
-        self.color = color
-        self.score = 1
-        self.alive = True
-
-    def move(self):
-        """Moves the snake one step in its current direction."""
-        head = self.body[0]
-        new_head = (head[0] + self.direction[0], head[1] + self.direction[1])
-        self.body.insert(0, new_head)
-        self.body.pop()
-
-    def grow(self):
-        """Grows the snake by one segment."""
-        tail = self.body[-1]
-        self.body.append(tail)
-        self.score += 1
-
-    def check_collision(self, other_snakes):
-        """Checks for collisions with walls, self, and other snakes."""
-        head = self.body[0]
-        # Wall collision
-        if not (0 <= head[0] < GRID_WIDTH and 0 <= head[1] < GRID_HEIGHT):
-            self.alive = False
-            return
-        # Self-collision
-        if head in self.body[1:]:
-            self.alive = False
-            return
-        # Other snake collision
-        for other in other_snakes:
-            if self == other:
-                continue
-            if head in other.body:
-                self.alive = False
-                return
-
-    def find_best_direction(self, food, all_snakes):
-        """AI to decide the snake's next move."""
-        head = self.body[0]
-        possible_moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-        
-        # Avoid immediate death
-        safe_moves = []
-        for move in possible_moves:
-            # Avoid moving back on itself
-            if len(self.body) > 1 and move[0] == -self.direction[0] and move[1] == -self.direction[1]:
-                continue
-
-            next_pos = (head[0] + move[0], head[1] + move[1])
-            
-            # Check wall collision
-            if not (0 <= next_pos[0] < GRID_WIDTH and 0 <= next_pos[1] < GRID_HEIGHT):
-                continue
-            
-            # Check collision with any snake
-            is_safe = True
-            for snake in all_snakes:
-                if next_pos in snake.body:
-                    is_safe = False
-                    break
-            if is_safe:
-                safe_moves.append(move)
-
-        if not safe_moves:
-            # No safe moves, just continue in the current direction
-            return
-
-        # Find nearest food
-        if food:
-            closest_food = min(food, key=lambda f: abs(f[0] - head[0]) + abs(f[1] - head[1]))
-            
-            # Prioritize moves towards food
-            best_moves = []
-            min_dist = float('inf')
-            for move in safe_moves:
-                next_pos = (head[0] + move[0], head[1] + move[1])
-                dist = abs(next_pos[0] - closest_food[0]) + abs(next_pos[1] - closest_food[1])
-                if dist < min_dist:
-                    min_dist = dist
-                    best_moves = [move]
-                elif dist == min_dist:
-                    best_moves.append(move)
-            
-            self.direction = random.choice(best_moves)
-        else:
-            # No food, move randomly
-            self.direction = random.choice(safe_moves)
-
-    def draw(self, screen):
-        """Draws the snake on the screen."""
-        for segment in self.body:
-            pygame.draw.rect(screen, self.color, (segment[0] * GRID_SIZE, segment[1] * GRID_SIZE, GRID_SIZE, GRID_SIZE))
+import os
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, FPS, BLACK, WHITE, RED, GRAY, LIGHT_GRAY, SNAKE_COLORS, MENU, PLAYING, GAME_OVER
+from snake import Snake
 
 class Game:
     """Manages the overall game state and logic."""
@@ -144,22 +16,22 @@ class Game:
         self.currency = 0
         self.score = 0
         self.high_score = 0
-        self.snakes_used = 0
         self.snakes = []
         self.food = []
         self.snake_cost = 10
         self.max_snakes = 10
         self.speed_boost = False
+        self.snakes_used = 0
 
         # Sound
         pygame.mixer.init()
         try:
-            pygame.mixer.music.load("C:/Users/thyag/OneDrive/Documentos/GitHub/snake_case/pac-man.mp3")
+            pygame.mixer.music.load(os.path.join("src", "assets", "pac-man.mp3"))
             pygame.mixer.music.set_volume(0.1)
             pygame.mixer.music.play(-1)
-            self.munch_sound = pygame.mixer.Sound("C:/Users/thyag/OneDrive/Documentos/GitHub/snake_case/munch-sound-effect.mp3")
+            self.munch_sound = pygame.mixer.Sound(os.path.join("src", "assets", "munch-sound-effect.mp3"))
             self.munch_sound.set_volume(0.3)
-            self.death_sound = pygame.mixer.Sound("C:/Users/thyag/OneDrive/Documentos/GitHub/snake_case/lego-yoda-death-sound-effect.mp3")
+            self.death_sound = pygame.mixer.Sound(os.path.join("src", "assets", "lego-yoda-death-sound-effect.mp3"))
             self.death_sound.set_volume(0.5)
             self.sounds_loaded = True
         except pygame.error:
@@ -196,7 +68,6 @@ class Game:
     def add_snake(self):
         """Adds a new snake to the game."""
         if len(self.snakes) < self.max_snakes:
-            self.snakes_used += 1
             start_pos = self.get_random_empty_pos()
             available_colors = [c for c in SNAKE_COLORS if c not in [s.color for s in self.snakes]]
             if not available_colors:
@@ -204,6 +75,7 @@ class Game:
             color = random.choice(available_colors)
             direction = random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])
             self.snakes.append(Snake(color, start_pos, direction))
+            self.snakes_used += 1
 
     def spawn_food(self):
         """Spawns food on the grid."""
@@ -344,38 +216,3 @@ class Game:
                 if menu_hovered:
                     self.state = MENU
         return True
-
-    async def run(self):
-        """The main game loop, compatible with asyncio for Pyodide."""
-        running = True
-        while running:
-            events = pygame.event.get()
-            for event in events:
-                if event.type == pygame.QUIT:
-                    running = False
-
-            if self.state == MENU:
-                running = self.run_menu(events)
-            elif self.state == PLAYING:
-                running = self.run_playing(events)
-            elif self.state == GAME_OVER:
-                running = self.run_game_over(events)
-
-            pygame.display.flip()
-            current_fps = 100 if self.speed_boost else FPS
-            self.clock.tick(current_fps)
-            await asyncio.sleep(0) # Yield control to the browser event loop
-
-        pygame.quit()
-
-# --- Main Execution ---
-async def main():
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("snake_case")
-    game = Game(screen)
-    await game.run()
-
-if __name__ == "__main__":
-    # This part is for running locally, Pyodide will call main() directly.
-    asyncio.run(main())
