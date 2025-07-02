@@ -71,7 +71,7 @@ If you make changes to the source code and want to generate a new executable, fo
     Navigate to the project's root directory and run PyInstaller using the provided spec file:
 
     ```bash
-    python -m PyInstaller --noconfirm main.spec
+    python -m PyInstaller --noconfirm --onefile --windowed --add-data "src/assets;assets" --add-data "highscore.txt;." src/main.py
     ```
 
     The new `main.exe` will be generated in the `dist/` folder.
