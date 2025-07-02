@@ -27,7 +27,13 @@ class Game:
         self.should_quit = False
 
         # Load high score
-        self.highscore_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "highscore.txt")
+        # When bundled with PyInstaller, sys.executable points to the .exe
+        # We want highscore.txt to be in the same directory as the .exe
+        if getattr(sys, 'frozen', False): # Check if running as a bundled executable
+            self.highscore_file = os.path.join(os.path.dirname(sys.executable), "highscore.txt")
+        else:
+            # For development, use the original path
+            self.highscore_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "highscore.txt")
         try:
             with open(self.highscore_file, "r") as f:
                 self.high_score = int(f.read())
