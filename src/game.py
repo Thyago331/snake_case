@@ -80,23 +80,29 @@ class Game:
         self.state = PLAYING
 
     def get_random_empty_pos(self):
-        """Gets a random empty position on the grid."""
-        all_occupied_pos = set()
-        for snake in self.snakes:
-            for segment in snake.body:
-                all_occupied_pos.add(segment)
-        for f in self.food:
-            all_occupied_pos.add(f)
+        """Gets a random empty position on the grid or ``None`` if full."""
+        all_positions = {
+            (x, y)
+            for x in range(GRID_WIDTH)
+            for y in range(GRID_HEIGHT)
+        }
 
-        while True:
-            pos = (random.randint(0, GRID_WIDTH - 1), random.randint(0, GRID_HEIGHT - 1))
-            if pos not in all_occupied_pos:
-                return pos
+        occupied = set()
+        for snake in self.snakes:
+            occupied.update(snake.body)
+        occupied.update(self.food)
+
+        empty_positions = list(all_positions - occupied)
+        if not empty_positions:
+            return None
+        return random.choice(empty_positions)
 
     def add_snake(self):
         """Adds a new snake to the game."""
         if len(self.snakes) < self.max_snakes:
             start_pos = self.get_random_empty_pos()
+            if start_pos is None:
+                return
             available_colors = [c for c in SNAKE_COLORS if c not in [s.color for s in self.snakes]]
             if not available_colors:
                 available_colors = SNAKE_COLORS # Reuse colors if all are taken
@@ -109,6 +115,8 @@ class Game:
         """Spawns food on the grid."""
         while len(self.food) < 1 + len(self.snakes) // 2 and len(self.food) < 5:
             pos = self.get_random_empty_pos()
+            if pos is None:
+                break
             self.food.append(pos)
 
     def draw_text(self, text, font, color, x, y, center=False):
