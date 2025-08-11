@@ -1,14 +1,13 @@
 import pygame
-import asyncio
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
-from game import Game
+from .core.constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from .core.game import Game
 
-async def main():
+def main() -> None:
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("snake_case")
     game = Game(screen)
-    await game.run()
+    game.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

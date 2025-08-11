@@ -1,6 +1,6 @@
 import pygame
 import random
-from constants import GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, SNAKE_COLORS
+from .constants import GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, SNAKE_COLORS
 
 class Snake:
     """Manages each snake's state, movement, and behavior."""
